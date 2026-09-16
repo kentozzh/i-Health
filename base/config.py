@@ -24,12 +24,13 @@ class Config:
 
         self.MYSQL_HOST = os.getenv('MYSQL_HOST', self.config.get('mysql', 'host', fallback='localhost'))
         self.MYSQL_USER = os.getenv('MYSQL_USER', self.config.get('mysql', 'user', fallback='root'))
-        self.MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', self.config.get('mysql', 'password', fallback='123456'))
+        # 密码不设默认值: 缺失时留空并让连接显式失败, 而不是静默回退到弱口令
+        self.MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', self.config.get('mysql', 'password', fallback=''))
         self.MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', self.config.get('mysql', 'database', fallback='health_qa'))
 
         self.REDIS_HOST = os.getenv('REDIS_HOST', self.config.get('redis', 'host', fallback='localhost'))
         self.REDIS_PORT = int(os.getenv('REDIS_PORT', self.config.get('redis', 'port', fallback=6379)))
-        self.REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', self.config.get('redis', 'password', fallback='1234'))
+        self.REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', self.config.get('redis', 'password', fallback=''))
         self.REDIS_DB = int(os.getenv('REDIS_DB', self.config.get('redis', 'db', fallback=0)))
 
         self.MILVUS_HOST = os.getenv('MILVUS_HOST', self.config.get('milvus', 'host', fallback='localhost'))
@@ -44,8 +45,10 @@ class Config:
         self.PARENT_CHUNK_SIZE = self.config.getint('retrieval', 'parent_chunk_size', fallback=1200)
         self.CHILD_CHUNK_SIZE = self.config.getint('retrieval', 'child_chunk_size', fallback=300)
         self.CHUNK_OVERLAP = self.config.getint('retrieval', 'chunk_overlap', fallback=50)
-        self.RETRIEVAL_K = self.config.getint('retrieval', 'retrieval_k', fallback=5)
+        self.RETRIEVAL_K = self.config.getint('retrieval', 'retrieval_k', fallback=20)
         self.CANDIDATE_M = self.config.getint('retrieval', 'candidate_m', fallback=2)
+        # 检索模式: dense / hybrid / full, 详见 rag_ablation.py 的消融实验
+        self.RETRIEVAL_MODE = self.config.get('retrieval', 'retrieval_mode', fallback='dense')
 
         self.VALID_SOURCES = eval(self.config.get('app', 'valid_sources', fallback='["亚健康", "体重管理", "作息睡眠", "心理健康", "营养学", "运动健身"]'))
         self.CUSTOMER_SERVICE_PHONE = self.config.get('app', 'customer_service_phone', fallback='182****1901')

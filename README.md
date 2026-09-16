@@ -6,19 +6,87 @@
 ## 核心特性
 - 四级递进召回：问候语规则 → Redis → BM25 标准问答库 → RAG 生成
 - BERT 意图分流：通用问题跳过检索直答
-- 混合检索：BGE-M3 稠密+稀疏双向量 → WeightedRanker 融合 → bge-reranker-large 精排
+- 检索链路可配置：BGE-M3 稠密单路 / 稠密+稀疏混合 + WeightedRanker 融合 / 叠加 bge-reranker-large 精排
 - 父子分块：子块检索保证命中精度，回溯父块保证上下文完整
 - Query 改写策略路由：HyDE / 子查询 / 回溯简化 / 直接检索
 - 真流式输出：WebSocket 逐 token 下发 + 阶段进度提示
 - 多格式文档入库：PDF / DOCX / PPT / 图片，OCR 自动降级
 
-## 评测结果 (RAGAS, 30 条评测集)
-| 指标              | 分数 |
-| ----------------- | ---- |
-| faithfulness      | 0.84 |
-| answer_relevancy  | 0.74 |
-| context_precision | 1.00 |
-| context_recall    | 0.94 |
+## 评测结果
+
+**实时链路实测**（30 条评测集：真实检索 + 真实生成，RAGAS 四维）：
+
+| 指标 | 分数 |
+| --- | --- |
+| faithfulness | 0.62 |
+| answer_relevancy | 0.88 |
+| context_precision | 0.85 |
+| context_recall | 0.85 |
+
+> 口径说明：上表由 [`rag_ablation.py`](rag_ablation.py) 走**实时链路**测出（检索 + 生成均真实执行），
+> 对应默认配置（稠密检索 / K=20 / M=2）。
+> [`rag_as.py`](rag/rag_assessment/rag_as.py) 则评测一份**固化快照**（`rag_evaluate_data.json`），
+> 用于可复现的历史对比，两者口径不同、不可混用。
+> 另注：30 条评测集规模偏小，指标差异需结合置信区间解读。
+
+### 检索策略消融实验
+
+用同一套 30 题、同一 Prompt、同一模型（temperature=0）对比三种检索方式与两种召回池宽度：
+
+| 配置 | faithfulness | answer_relevancy | context_precision | context_recall | 检索 P50 |
+| --- | --- | --- | --- | --- | --- |
+| 稠密单路 K=3 | **0.655** | 0.874 | **0.867** | 0.820 | 0.5s |
+| **稠密单路 K=20（当前默认）** | 0.623 | **0.884** | 0.850 | **0.854** | **0.6s** |
+| 混合 K=3 | 0.542 | 0.853 | 0.817 | 0.731 | 0.5s |
+| 混合 + 重排 K=3 | 0.570 | 0.867 | 0.800 | 0.787 | 5.8s |
+| 混合 + 重排 K=20 | 0.617 | 0.880 | 0.850 | 0.806 | 26.6s |
+
+**结论（数据驱动地调整了默认配置）**：
+
+1. 重排在召回池仅 `K=3` 时**无正收益**，甚至拉低 faithfulness（0.655 → 0.570）——
+   交叉编码器只有 3 个候选可排，无从发挥。
+2. 将召回池扩到 `K=20` 后各指标回升（precision 0.800 → 0.850、faithfulness 0.570 → 0.617），
+   证实窄召回池是重排失效的直接原因。
+3. 但在**同一池宽**下，稠密单路仍全面不劣于混合+重排，且检索 P50 仅 **0.6s vs 26.6s（约 45 倍差距）**。
+4. 因此默认配置改为 **稠密单路 + K=20**；重排链路完整保留，可通过
+   `config.ini` 的 `retrieval_mode = full` 一键切回。
+
+原始实验数据见 [`rag/rag_assessment/ablation_cache/`](rag/rag_assessment/ablation_cache/)，
+可配 `python rag_ablation.py --reuse` 在不重复检索/生成的前提下重跑评测。
+
+> 边界说明：30 题评测集偏"直接事实型"，**未覆盖重排最擅长的场景**（专有名词消歧、多实体比较），
+> 因此结论应表述为"在本项目评测集上重排无正收益"，而非"重排无用"。
+
+### 四级召回命中率基准
+
+[`bench_recall.py`](bench_recall.py) 在 **800 条查询**（200 条 FAQ 原题 + 600 条规则轻改写）上实测：
+
+| 层 | 冷缓存 | 热缓存 | 延迟 P50 / P95 |
+| --- | --- | --- | --- |
+| ① 问候语规则 | 正则匹配，构造上 100% | — | ~0 |
+| ② Redis 缓存 | 0 | **792 / 800（99.0%）** | **0.9ms / 1.4ms** |
+| ③ BM25 + 标准问答库 | **792 / 800（99.0%）** | 0 | **3.4ms / 5.1ms** |
+| ④ RAG 检索生成 | 8 / 800（1.0%） | 8 / 800（1.0%） | ~34s |
+
+对标准问答库覆盖的问题，**拦截率 99.0%，且拦截即正确**（正确率同为 99.0%，零误匹配）。
+
+阈值扫描（同时统计负样本假阳性率）：
+
+| 阈值 | 原题拦截率 | 硬负假阳率 | 软负拦截率 |
+| --- | --- | --- | --- |
+| 0.70 | 100% | **0.0%** | 26.7% |
+| **0.85（默认）** | 99.0% | **0.0%** | 16.7% |
+| 0.95 | 97.0% | 0.0% | 6.7% |
+
+- **硬负样本**（明显域外 + 健康域内短泛化）最高分仅 **0.367**，说明阈值只要 >0.40 就不会误拦域外问题。
+- **软负样本**（领域内但开放的问题，取自评测集 30 题）在 0.85 阈值下仍有 **16.7% 被拦截**，
+  其中 3 条为**错误匹配**（例如"膳食参考摄入量（DRIs）包括哪些指标？"以 0.898 分被答成
+  "抑郁情绪和抑郁症有什么区别？"）。这暴露出**以 softmax 概率作置信度的结构性缺陷**：
+  泛化疑问措辞（"包括哪些""有什么区别""分别"）在分词后与多条 FAQ 共享词元，产生虚高分数。
+  改进方向是改用 Top1–Top2 分数间隔（margin）作判据，或先过滤疑问套话再计算 BM25。
+
+> 口径说明：上述 99.0% 是"**标准问答库覆盖范围内**的拦截率"，不等于真实流量的命中率 ——
+> 后者取决于用户提问落在 200 条 FAQ 覆盖范围内的比例，需线上数据才能统计。
 
 ## 架构图
 
@@ -65,6 +133,8 @@ i-Health_system/
 ├── app.py                          # ★ 服务入口: FastAPI HTTP 接口 + WebSocket 流式问答
 ├── init_data.py                    # ★ 数据初始化: 建表 -> 导入 FAQ -> 文档向量入库
 ├── main_v2.py                      # ★ 集成核心: 四级递进召回调度 + 会话历史管理
+├── bench_recall.py                 # ★ 召回命中率基准: 分层拦截率 / 阈值扫描 / 负样本假阳性
+├── rag_ablation.py                 # ★ 检索策略消融: 实时链路 (真检索+真生成) + RAGAS 评测
 ├── main.py                         #   早期命令行版入口 (保留作参照)
 ├── config.example.ini              #   配置模板 -> 复制为 config.ini 并填入 API Key
 ├── config.ini                      #   本地配置(含密钥) -> 已被 .gitignore 排除
@@ -92,7 +162,7 @@ i-Health_system/
 │
 ├── rag/                            # 检索增强生成层
 │   ├── core/
-│   │   ├── vector_store.py             # ★ BGE-M3 双向量 + Milvus 混合检索 + Cross-Encoder 重排
+│   │   ├── vector_store.py             # ★ Milvus 检索: 稠密/混合/混合+重排 三模式可配 + 父子去重
 │   │   ├── rag_system_v2.py            # ★ 流式 RAG 主流程 (策略路由 + 阶段进度上报)
 │   │   ├── search_strategy_selector.py #   LLM 检索策略路由 (HyDE/子查询/回溯/直接)
 │   │   ├── intent_recognizer.py        # ★ BERT 通用-专业意图分类 (缺失权重时自动训练)
@@ -110,8 +180,9 @@ i-Health_system/
 │   │   ├── chinese_recursive_splitter.py  # ★ 中文递归分割器 (标点分隔优先级)
 │   │   └── semantic_splitter.py   #     基于 modelscope 的语义分段 (可选依赖)
 │   ├── rag_assessment/
-│   │   ├── rag_as.py                   # ★ RAGAS 四维评测脚本 (Ollama / DashScope 双后端)
-│   │   └── rag_evaluate_data.json      #   30 条评测集
+│   │   ├── rag_as.py                   #   RAGAS 四维评测 (固化快照口径, Ollama / DashScope 双后端)
+│   │   ├── rag_evaluate_data.json      #   30 条评测集 (question / context / answer / ground_truth)
+│   │   └── ablation_cache/             #   ★ 消融实验原始数据 (5 组配置 + 汇总 JSON)
 │   ├── bert_train_data/
 │   │   └── bert专业通用问题分类500条.json  # 意图分类训练语料
 │   ├── main.py                         # ★ 双模式入口: --data-processing 文档入库 / 命令行问答

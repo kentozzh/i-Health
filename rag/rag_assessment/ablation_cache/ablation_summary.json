@@ -1,0 +1,30 @@
+[
+  {
+    "tag": "dense_m2_k20",
+    "mode": "dense",
+    "m": 2,
+    "k": 20,
+    "scores": {
+      "faithfulness": 0.6225185259378606,
+      "answer_relevancy": 0.8835146117041746,
+      "context_precision": 0.8499999999266665,
+      "context_recall": 0.8535714285714285
+    },
+    "avg_ctx": 2,
+    "p50_retr_ms": 594.8177999816835
+  },
+  {
+    "tag": "full_m2_k20",
+    "mode": "full",
+    "m": 2,
+    "k": 20,
+    "scores": {
+      "faithfulness": 0.6173565759296983,
+      "answer_relevancy": 0.8800151541474388,
+      "context_precision": 0.8499999999316666,
+      "context_recall": 0.8063492063492065
+    },
+    "avg_ctx": 2,
+    "p50_retr_ms": 26639.43440024741
+  }
+]

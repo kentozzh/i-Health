@@ -1,0 +1,47 @@
+[
+  {
+    "tag": "dense_m2_k3",
+    "mode": "dense",
+    "m": 2,
+    "k": 3,
+    "scores": {
+      "faithfulness": 0.6546402368299163,
+      "answer_relevancy": 0.8737423696757572,
+      "context_precision": 0.8666666665883331,
+      "context_recall": 0.8198412698412697
+    },
+    "avg_ctx": 1.7,
+    "p50_retr_ms": 482,
+    "note": "第一轮消融(K=3)结果, 于 2026-09-16 18:27 完成"
+  },
+  {
+    "tag": "hybrid_m2_k3",
+    "mode": "hybrid",
+    "m": 2,
+    "k": 3,
+    "scores": {
+      "faithfulness": 0.5417027277520925,
+      "answer_relevancy": 0.8534518997228443,
+      "context_precision": 0.8166666665949999,
+      "context_recall": 0.7312698412698413
+    },
+    "avg_ctx": 1.7,
+    "p50_retr_ms": 472,
+    "note": "第一轮消融(K=3)结果, 于 2026-09-16 18:47 完成"
+  },
+  {
+    "tag": "full_m2_k3",
+    "mode": "full",
+    "m": 2,
+    "k": 3,
+    "scores": {
+      "faithfulness": 0.5701858469870394,
+      "answer_relevancy": 0.866702532603713,
+      "context_precision": 0.7999999999299999,
+      "context_recall": 0.7868253968253968
+    },
+    "avg_ctx": 1.7,
+    "p50_retr_ms": 5824,
+    "note": "第一轮消融(K=3)结果, 于 2026-09-16 19:07 完成; full 即生产配置"
+  }
+]

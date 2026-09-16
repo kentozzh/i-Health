@@ -1,0 +1,59 @@
+{
+  "experiment": "RAG 检索策略消融 (实时链路: 真实检索 + 真实生成 + RAGAS)",
+  "eval_set": "rag/rag_assessment/rag_evaluate_data.json (30 题)",
+  "protocol": {
+    "strategy_routing": "关闭(固定直接检索, 以隔离检索方式这一单一变量)",
+    "prompt": "与生产一致的 RAGPrompts.rag_prompt()",
+    "generator": "qwen-plus (temperature=0)",
+    "judge": "RAGAS + DashScope API (qwen-plus + text-embedding-v4)",
+    "candidate_m": 2
+  },
+  "runs": [
+    {
+      "config": "dense_m2_k3",
+      "desc": "稠密单路, 召回池 3",
+      "faithfulness": 0.6546, "answer_relevancy": 0.8737,
+      "context_precision": 0.8667, "context_recall": 0.8198,
+      "avg_contexts": 1.7, "retrieval_p50_ms": 482
+    },
+    {
+      "config": "dense_m2_k20",
+      "desc": "稠密单路, 召回池 20  <- 调整后的默认配置",
+      "faithfulness": 0.6225, "answer_relevancy": 0.8835,
+      "context_precision": 0.8500, "context_recall": 0.8536,
+      "avg_contexts": 2.0, "retrieval_p50_ms": 595
+    },
+    {
+      "config": "hybrid_m2_k3",
+      "desc": "稠密+稀疏融合(WeightedRanker), 不重排, 召回池 3",
+      "faithfulness": 0.5417, "answer_relevancy": 0.8535,
+      "context_precision": 0.8167, "context_recall": 0.7313,
+      "avg_contexts": 1.7, "retrieval_p50_ms": 472
+    },
+    {
+      "config": "full_m2_k3",
+      "desc": "hybrid + bge-reranker-large 精排, 召回池 3 (调整前的默认配置)",
+      "faithfulness": 0.5702, "answer_relevancy": 0.8667,
+      "context_precision": 0.8000, "context_recall": 0.7868,
+      "avg_contexts": 1.7, "retrieval_p50_ms": 5824
+    },
+    {
+      "config": "full_m2_k20",
+      "desc": "hybrid + 精排, 召回池 20",
+      "faithfulness": 0.6174, "answer_relevancy": 0.8800,
+      "context_precision": 0.8500, "context_recall": 0.8063,
+      "avg_contexts": 2.0, "retrieval_p50_ms": 26639
+    }
+  ],
+  "conclusions": [
+    "重排在召回池 K=3 时无正收益并拉低 faithfulness(0.6546 -> 0.5702): 交叉编码器只有 3 个候选可排, 无从发挥。",
+    "将召回池扩到 K=20 后, full 各指标回升(precision 0.800 -> 0.850, faithfulness 0.570 -> 0.617), 证实窄召回池是重排失效的直接原因。",
+    "但在同一池宽下, dense 全面不劣于 full(K=20 时 context_recall 0.854 vs 0.806), 且检索 P50 仅 595ms vs 26639ms, 相差约 45 倍。",
+    "据此把默认配置调整为 稠密单路 + K=20; 重排链路完整保留, 可用 config.ini 的 retrieval_mode=full 切回。"
+  ],
+  "caveats": [
+    "30 题评测集规模偏小, 0.006~0.048 的差异可能包含噪声(观测过约 ±0.02 的跑间波动)。",
+    "评测集偏'直接事实型'问题, 未覆盖重排最擅长的场景(专有名词消歧、多实体比较), 故结论应限定为'在本项目评测集上重排无正收益'。",
+    "检索延迟为 CPU 推理结果, 未启用 GPU。"
+  ]
+}
