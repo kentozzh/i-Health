@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>i-Health 智能健康问答系统</title>
+    <!-- 引入 Font Awesome 图标库 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- 引入 marked.js 用于解析 Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- CDN 加载失败的本地兜底: 提供轻量 Markdown 渲染器, 保证页面离线/内网也能正常收发消息 -->
+    <script>
+        if (typeof window.marked === 'undefined') {
+            window.marked = {
+                parse: function (text) {
+                    if (text == null) return '';
+                    var html = String(text)
+                        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')   // **加粗**
+                        .replace(/`([^`]+)`/g, '<code>$1</code>')           // 行内代码
+                        .replace(/^#{1,6}\s+(.*)$/gm, '<strong>$1</strong>') // 标题->加粗
+                        .replace(/^\s*[-*]\s+(.*)$/gm, '• $1')              // 无序列表
+                        .replace(/\r\n/g, '\n').replace(/\n/g, '<br>');     // 换行
+                    return html;
+                }
+            };
+        }
+    </script>
+    <style>
+        :root {
+            --primary-color: #4a6fa5; /* 主要颜色 */
+            --primary-light: #6b8bb8; /* 主要亮色 */
+            --primary-dark: #3a5a8c; /* 主要暗色 */
+            --secondary-color: #6c757d; /* 次要颜色 */
+            --accent-color: #61dafb; /* 强调颜色 */
+            --bg-color: #f8f9fa; /* 背景颜色 */
+            --text-color: #343a40; /* 文本颜色 */
+            --border-color: #dee2e6; /* 边框颜色 */
+            --hover-color: #e9ecef; /* 悬停颜色 */
+            --success-color: #28a745; /* 成功颜色 */
+            --info-color: #17a2b8; /* 信息颜色 */
+            --warning-color: #ffc107; /* 警告颜色 */
+            --danger-color: #dc3545; /* 危险颜色 */
+            --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* 卡片阴影 */
+            --transition: all 0.3s ease; /* 过渡效果 */
+        }
+
+        * {
+            box-sizing: border-box; /* 盒模型 */
+            margin: 0; /* 外边距 */
+            padding: 0; /* 内边距 */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* 字体族 */
+            line-height: 1.6; /* 行高 */
+            color: var(--text-color); /* 文本颜色 */
+            background-color: var(--bg-color); /* 背景颜色 */
+            display: flex; /* 弹性布局 */
+            flex-direction: column; /* 垂直排列 */
+            height: 100vh; /* 高度100%视口 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        /* 深色模式支持 */
+        body.dark-mode {
+            --primary-color: #5b7cac; /* 主要颜色 */
+            --primary-light: #7c9dcf; /* 主要亮色 */
+            --primary-dark: #4a6fa5; /* 主要暗色 */
+            --secondary-color: #adb5bd; /* 次要颜色 */
+            --bg-color: #212529; /* 背景颜色 */
+            --text-color: #f8f9fa; /* 文本颜色 */
+            --border-color: #343a40; /* 边框颜色 */
+            --hover-color: #343a40; /* 悬停颜色 */
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); /* 渐变背景 */
+            color: white; /* 文本颜色 */
+            padding: 1rem; /* 内边距 */
+            text-align: center; /* 文本居中 */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 阴影 */
+            position: relative; /* 相对定位 */
+        }
+
+        /* 深色模式切换按钮 */
+        .theme-toggle {
+            position: absolute; /* 绝对定位 */
+            right: 1rem; /* 右1rem */
+            top: 50%; /* 顶部50% */
+            transform: translateY(-50%); /* Y轴居中 */
+            background: none; /* 背景无 */
+            border: none; /* 边框无 */
+            color: white; /* 颜色白色 */
+            font-size: 1.2rem; /* 字体大小 */
+            cursor: pointer; /* 鼠标指针 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        .theme-toggle:hover {
+            transform: translateY(-50%) scale(1.1); /* 悬停放大 */
+        }
+
+        /* 页面版本标记 -> 便于确认浏览器加载的是最新前端(避免缓存导致看到旧页面) */
+        .version-tag {
+            font-size: 0.7rem; /* 字体大小 */
+            font-weight: normal; /* 非粗体 */
+            opacity: 0.8; /* 透明度 */
+            border: 1px solid rgba(255, 255, 255, 0.5); /* 边框 */
+            border-radius: 10px; /* 圆角 */
+            padding: 0.1rem 0.5rem; /* 内边距 */
+            margin-left: 0.5rem; /* 左边距 */
+            vertical-align: middle; /* 垂直居中 */
+            white-space: nowrap; /* 不换行 */
+        }
+
+        .container {
+            max-width: 1200px; /* 最大宽度 */
+            margin: 0 auto; /* 居中 */
+            padding: 1rem; /* 内边距 */
+            display: flex; /* 弹性布局 */
+            flex: 1; /* 占满剩余空间 */
+            flex-direction: column; /* 垂直排列 */
+        }
+
+        .chat-container {
+            display: flex; /* 弹性布局 */
+            height: calc(100vh - 180px); /* 高度计算 */
+            border: 1px solid var(--border-color); /* 边框 */
+            border-radius: 8px; /* 圆角 */
+            overflow: hidden; /* 溢出隐藏 */
+            background-color: var(--bg-color); /* 背景颜色 */
+            box-shadow: var(--card-shadow); /* 卡片阴影 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        .sidebar {
+            width: 280px; /* 宽度 */
+            background-color: var(--bg-color); /* 背景颜色 */
+            padding: 1rem; /* 内边距 */
+            border-right: 1px solid var(--border-color); /* 右边框 */
+            display: flex; /* 弹性布局 */
+            flex-direction: column; /* 垂直排列 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        /* 搜索框样式 */
+        .search-box {
+            padding: 0.5rem; /* 内边距 */
+            border-radius: 4px; /* 圆角 */
+            border: 1px solid var(--border-color); /* 边框 */
+            background-color: var(--bg-color); /* 背景颜色 */
+            color: var(--text-color); /* 文本颜色 */
+            margin-bottom: 1rem; /* 下边距 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        .search-box:focus {
+            outline: none; /* 无轮廓 */
+            border-color: var(--primary-color); /* 边框颜色 */
+            box-shadow: 0 0 0 2px rgba(74, 111, 165, 0.2); /* 焦点阴影 */
+        }
+
+        .main-content {
+            flex: 1; /* 占满剩余空间 */
+            display: flex; /* 弹性布局 */
+            flex-direction: column; /* 垂直排列 */
+            position: relative; /* 相对定位 */
+        }
+
+        .chat-history {
+            flex: 1; /* 占满剩余空间 */
+            padding: 1rem; /* 内边距 */
+            overflow-y: auto; /* 垂直滚动 */
+            scroll-behavior: smooth; /* 平滑滚动 */
+            background-color: var(--bg-color); /* 背景颜色 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        .chat-input-container {
+            padding: 1rem; /* 内边距 */
+            border-top: 1px solid var(--border-color); /* 上边框 */
+            background-color: var(--bg-color); /* 背景颜色 */
+            display: flex; /* 弹性布局 */
+            flex-direction: column; /* 垂直排列 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        .source-filter {
+            display: flex; /* 弹性布局 */
+            align-items: center; /* 垂直居中 */
+            margin-bottom: 0.5rem; /* 下边距 */
+            color: var(--text-color); /* 文本颜色 */
+        }
+
+        .source-filter select {
+            margin-left: 0.5rem; /* 左边距 */
+            padding: 0.3rem; /* 内边距 */
+            border-radius: 4px; /* 圆角 */
+            border: 1px solid var(--border-color); /* 边框 */
+            background-color: var(--bg-color); /* 背景颜色 */
+            color: var(--text-color); /* 文本颜色 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        .input-tools {
+            display: flex; /* 弹性布局 */
+            margin-bottom: 0.5rem; /* 下边距 */
+            gap: 0.5rem; /* 间距 */
+        }
+
+        .tool-btn {
+            background-color: transparent; /* 透明背景 */
+            border: none; /* 无边框 */
+            color: var(--secondary-color); /* 文本颜色 */
+            cursor: pointer; /* 鼠标指针 */
+            padding: 0.3rem; /* 内边距 */
+            border-radius: 4px; /* 圆角 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        .tool-btn:hover {
+            background-color: var(--hover-color); /* 悬停背景 */
+            color: var(--primary-color); /* 悬停颜色 */
+        }
+
+        .input-group {
+            display: flex; /* 弹性布局 */
+            position: relative; /* 相对定位 */
+        }
+
+        .chat-input {
+            flex: 1; /* 占满剩余空间 */
+            padding: 0.75rem; /* 内边距 */
+            border: 1px solid var(--border-color); /* 边框 */
+            border-radius: 4px 0 0 4px; /* 圆角 */
+            font-size: 1rem; /* 字体大小 */
+            resize: none; /* 不可调整大小 */
+            height: 45px; /* 高度 */
+            max-height: 150px; /* 最大高度 */
+            overflow-y: auto; /* 垂直滚动 */
+            background-color: var(--bg-color); /* 背景颜色 */
+            color: var(--text-color); /* 文本颜色 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        .chat-input:focus {
+            outline: none; /* 无轮廓 */
+            border-color: var(--primary-color); /* 边框颜色 */
+            box-shadow: 0 0 0 2px rgba(74, 111, 165, 0.2); /* 焦点阴影 */
+        }
+
+        .send-btn {
+            background-color: var(--primary-color); /* 背景颜色 */
+            color: white; /* 文本颜色 */
+            border: none; /* 无边框 */
+            padding: 0 1.25rem; /* 内边距 */
+            border-radius: 0 4px 4px 0; /* 圆角 */
+            cursor: pointer; /* 鼠标指针 */
+            font-size: 1rem; /* 字体大小 */
+            transition: var(--transition); /* 过渡效果 */
+            display: flex; /* 弹性布局 */
+            align-items: center; /* 垂直居中 */
+            justify-content: center; /* 水平居中 */
+            gap: 0.5rem; /* 间距 */
+        }
+
+        .send-btn:hover {
+            background-color: var(--primary-dark); /* 悬停背景 */
+            transform: translateY(-2px); /* 上移 */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* 悬停阴影 */
+        }
+
+        .send-btn:active {
+            transform: translateY(0); /* 恢复 */
+            box-shadow: none; /* 无阴影 */
+        }
+
+        .send-btn:disabled {
+            background-color: var(--secondary-color); /* 禁用背景 */
+            cursor: not-allowed; /* 禁用指针 */
+        }
+
+        .message {
+            margin-bottom: 1rem; /* 下边距 */
+            display: flex; /* 弹性布局 */
+            flex-direction: column; /* 垂直排列 */
+            animation: fadeIn 0.3s ease; /* 淡入动画 */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-header {
+            display: flex; /* 弹性布局 */
+            align-items: center; /* 垂直居中 */
+            margin-bottom: 0.25rem; /* 下边距 */
+            font-size: 0.85rem; /* 字体大小 */
+            color: var(--secondary-color); /* 文本颜色 */
+        }
+
+        .avatar {
+            width: 32px; /* 宽度 */
+            height: 32px; /* 高度 */
+            border-radius: 50%; /* 圆形 */
+            margin-right: 0.5rem; /* 右边距 */
+            background-color: var(--primary-color); /* 背景颜色 */
+            color: white; /* 文本颜色 */
+            display: flex; /* 弹性布局 */
+            align-items: center; /* 垂直居中 */
+            justify-content: center; /* 水平居中 */
+            font-weight: bold; /* 粗体 */
+        }
+
+        .message-content {
+            padding: 0.75rem 1rem; /* 内边距 */
+            border-radius: 8px; /* 圆角 */
+            max-width: 80%; /* 最大宽度 */
+            word-break: break-word; /* 单词换行 */
+            box-shadow: var(--card-shadow); /* 卡片阴影 */
+            position: relative; /* 相对定位 */
+        }
+
+        .user-message {
+            align-self: flex-end; /* 右对齐 */
+        }
+
+        .user-message .message-content {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light)); /* 渐变背景 */
+            color: white; /* 文本颜色 */
+            align-self: flex-end; /* 右对齐 */
+            border-top-right-radius: 0; /* 右上圆角0 */
+        }
+
+        .system-message {
+            align-self: flex-start; /* 左对齐 */
+        }
+
+        .system-message .message-content {
+            background-color: var(--hover-color); /* 背景颜色 */
+            color: var(--text-color); /* 文本颜色 */
+            align-self: flex-start; /* 左对齐 */
+            border-top-left-radius: 0; /* 左上圆角0 */
+        }
+
+        /* 消息状态指示 */
+        .message-status {
+            display: flex; /* 弹性布局 */
+            align-items: center; /* 垂直居中 */
+            margin-top: 0.25rem; /* 上边距 */
+            font-size: 0.75rem; /* 字体大小 */
+            color: var(--secondary-color); /* 文本颜色 */
+            justify-content: flex-end; /* 右对齐 */
+        }
+
+        /* 代码块样式 */
+        .message-content pre {
+            background-color: rgba(0, 0, 0, 0.05); /* 背景颜色 */
+            padding: 1rem; /* 内边距 */
+            border-radius: 4px; /* 圆角 */
+            overflow-x: auto; /* 水平滚动 */
+            margin: 0.5rem 0; /* 上下边距 */
+        }
+
+        .message-content code {
+            font-family: 'Courier New', Courier, monospace; /* 字体族 */
+            font-size: 0.9rem; /* 字体大小 */
+        }
+
+        /* 图片样式 */
+        .message-content img {
+            max-width: 100%; /* 最大宽度 */
+            border-radius: 4px; /* 圆角 */
+            margin: 0.5rem 0; /* 上下边距 */
+        }
+
+        .typing-indicator {
+            display: inline-block; /* 行内块 */
+            padding: 0.75rem 1rem; /* 内边距 */
+            background-color: var(--hover-color); /* 背景颜色 */
+            border-radius: 8px; /* 圆角 */
+            margin-bottom: 1rem; /* 下边距 */
+            box-shadow: var(--card-shadow); /* 卡片阴影 */
+        }
+
+        .typing-indicator span {
+            display: inline-block; /* 行内块 */
+            width: 8px; /* 宽度 */
+            height: 8px; /* 高度 */
+            border-radius: 50%; /* 圆形 */
+            background-color: var(--secondary-color); /* 背景颜色 */
+            margin-right: 4px; /* 右边距 */
+            animation: typing 1s infinite; /* 打字动画 */
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s; /* 延迟 */
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s; /* 延迟 */
+            margin-right: 0; /* 无右边距 */
+        }
+
+        @keyframes typing {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .session-controls {
+            display: flex; /* 弹性布局 */
+            justify-content: space-between; /* 两端对齐 */
+            margin-bottom: 1rem; /* 下边距 */
+            gap: 0.5rem; /* 间距 */
+        }
+
+        .new-session-btn, .clear-history-btn {
+            background-color: var(--secondary-color); /* 背景颜色 */
+            color: white; /* 文本颜色 */
+            border: none; /* 无边框 */
+            padding: 0.5rem 1rem; /* 内边距 */
+            border-radius: 4px; /* 圆角 */
+            cursor: pointer; /* 鼠标指针 */
+            font-size: 0.9rem; /* 字体大小 */
+            transition: var(--transition); /* 过渡效果 */
+            display: flex; /* 弹性布局 */
+            align-items: center; /* 垂直居中 */
+            justify-content: center; /* 水平居中 */
+            gap: 0.3rem; /* 间距 */
+            flex: 1; /* 占满剩余空间 */
+        }
+
+        .new-session-btn:hover, .clear-history-btn:hover {
+            background-color: var(--primary-color); /* 悬停背景 */
+            transform: translateY(-2px); /* 上移 */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* 悬停阴影 */
+        }
+
+        .new-session-btn:active, .clear-history-btn:active {
+            transform: translateY(0); /* 恢复 */
+            box-shadow: none; /* 无阴影 */
+        }
+
+        .session-info {
+            font-size: 0.9rem; /* 字体大小 */
+            color: var(--secondary-color); /* 文本颜色 */
+            margin-top: 1rem; /* 上边距 */
+            padding-top: 1rem; /* 上内边距 */
+            border-top: 1px solid var(--border-color); /* 上边框 */
+        }
+
+        .history-title {
+            font-weight: bold; /* 粗体 */
+            margin-bottom: 1rem; /* 下边距 */
+            color: var(--primary-color); /* 文本颜色 */
+            display: flex; /* 弹性布局 */
+            align-items: center; /* 垂直居中 */
+            gap: 0.5rem; /* 间距 */
+        }
+
+        .history-list {
+            flex: 1; /* 占满剩余空间 */
+            overflow-y: auto; /* 垂直滚动 */
+        }
+
+        .history-item {
+            padding: 0.65rem 0.75rem; /* 内边距 */
+            border-bottom: 1px solid var(--border-color); /* 下边框 */
+            cursor: pointer; /* 鼠标指针 */
+            transition: var(--transition); /* 过渡效果 */
+            border-radius: 4px; /* 圆角 */
+            margin-bottom: 0.5rem; /* 下边距 */
+            background-color: var(--hover-color); /* 背景颜色 */
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); /* 阴影 */
+            display: flex; /* 弹性布局: 左侧会话信息 + 右侧删除按钮 */
+            align-items: center; /* 垂直居中 */
+            gap: 0.4rem; /* 间距 */
+            border-left: 3px solid transparent; /* 选中态占位, 避免选中时布局跳动 */
+        }
+
+        .history-item:hover {
+            background-color: rgba(74, 111, 165, 0.1); /* 悬停背景 */
+            transform: translateX(3px); /* 右移 */
+        }
+
+        /* 当前会话高亮 */
+        .history-item.active {
+            background-color: rgba(74, 111, 165, 0.16); /* 选中背景 */
+            border-left-color: var(--primary-color); /* 选中左侧色条 */
+        }
+
+        .history-item-main {
+            flex: 1; /* 占满剩余空间 */
+            min-width: 0; /* 允许内部文本省略号生效 */
+        }
+
+        /* 会话删除按钮: 默认隐藏, 悬停/选中时显示 */
+        .history-delete {
+            flex: 0 0 auto; /* 不伸缩 */
+            background: none; /* 背景无 */
+            border: none; /* 边框无 */
+            color: var(--secondary-color); /* 颜色 */
+            cursor: pointer; /* 鼠标指针 */
+            padding: 0.2rem 0.3rem; /* 内边距 */
+            border-radius: 4px; /* 圆角 */
+            opacity: 0; /* 默认隐藏 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        .history-item:hover .history-delete,
+        .history-item.active .history-delete {
+            opacity: 1; /* 悬停或选中时显示 */
+        }
+
+        .history-delete:hover {
+            color: var(--danger-color); /* 悬停变红 */
+            background-color: rgba(220, 53, 69, 0.12); /* 悬停背景 */
+        }
+
+        /* 会话列表为空时的占位提示 */
+        .history-empty {
+            color: var(--secondary-color); /* 文本颜色 */
+            font-size: 0.85rem; /* 字体大小 */
+            text-align: center; /* 居中 */
+            padding: 1rem 0; /* 内边距 */
+        }
+
+        /* 流式生成阶段提示(RAG检索等待期间的实时反馈, 避免前端看起来"卡死") */
+        .stream-status {
+            color: var(--secondary-color); /* 文本颜色 */
+            font-size: 0.9rem; /* 字体大小 */
+            font-style: italic; /* 斜体 */
+        }
+
+        .history-question {
+            font-weight: bold; /* 粗体 */
+            white-space: nowrap; /* 不换行 */
+            overflow: hidden; /* 溢出隐藏 */
+            text-overflow: ellipsis; /* 省略号 */
+            color: var(--text-color); /* 文本颜色 */
+        }
+
+        .history-answer {
+            color: var(--secondary-color); /* 文本颜色 */
+            white-space: nowrap; /* 不换行 */
+            overflow: hidden; /* 溢出隐藏 */
+            text-overflow: ellipsis; /* 省略号 */
+            font-size: 0.85rem; /* 字体大小 */
+        }
+
+        .loading-overlay {
+            position: absolute; /* 绝对定位 */
+            top: 0; /* 顶部 */
+            left: 0; /* 左侧 */
+            right: 0; /* 右侧 */
+            bottom: 0; /* 底部 */
+            background-color: rgba(255, 255, 255, 0.8); /* 背景颜色 */
+            display: flex; /* 弹性布局 */
+            justify-content: center; /* 水平居中 */
+            align-items: center; /* 垂直居中 */
+            z-index: 10; /* 层级 */
+            visibility: hidden; /* 隐藏 */
+            backdrop-filter: blur(2px); /* 背景模糊 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        body.dark-mode .loading-overlay {
+            background-color: rgba(33, 37, 41, 0.8); /* 深色模式背景 */
+        }
+
+        .spinner {
+            width: 50px; /* 宽度 */
+            height: 50px; /* 高度 */
+            border: 5px solid rgba(0, 0, 0, 0.1); /* 边框 */
+            border-radius: 50%; /* 圆形 */
+            border-left-color: var(--primary-color); /* 左边框颜色 */
+            animation: spin 1s linear infinite; /* 旋转动画 */
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 快捷回复区域 */
+        .quick-replies {
+            display: flex; /* 弹性布局 */
+            flex-wrap: wrap; /* 换行 */
+            gap: 0.5rem; /* 间距 */
+            margin-top: 0.5rem; /* 上边距 */
+        }
+
+        .quick-reply-btn {
+            padding: 0.3rem 0.75rem; /* 内边距 */
+            background-color: var(--hover-color); /* 背景颜色 */
+            border: 1px solid var(--border-color); /* 边框 */
+            border-radius: 20px; /* 圆角 */
+            color: var(--text-color); /* 文本颜色 */
+            cursor: pointer; /* 鼠标指针 */
+            font-size: 0.85rem; /* 字体大小 */
+            transition: var(--transition); /* 过渡效果 */
+        }
+
+        .quick-reply-btn:hover {
+            background-color: var(--primary-color); /* 悬停背景 */
+            color: white; /* 悬停颜色 */
+            border-color: var(--primary-color); /* 悬停边框 */
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .chat-container {
+                flex-direction: column; /* 垂直排列 */
+            }
+
+            .sidebar {
+                width: 100%; /* 宽度100% */
+                border-right: none; /* 无边框 */
+                border-bottom: 1px solid var(--border-color); /* 下边框 */
+                max-height: 200px; /* 最大高度 */
+            }
+
+            .message-content {
+                max-width: 90%; /* 最大宽度90% */
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>i-Health 智能健康问答系统 <span class="version-tag">v2.0 流式输出 · 多会话历史</span></h1>
+        <button class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+        </button>
+    </header>
+
+    <div class="container">
+        <div class="chat-container">
+            <div class="sidebar">
+                <!-- 搜索框 -->
+                <input type="text" class="search-box" id="searchBox" placeholder="搜索历史会话...">
+                
+                <!-- 会话控制按钮 -->
+                <div class="session-controls">
+                    <button class="new-session-btn" id="newSessionBtn">
+                        <i class="fas fa-plus"></i> 新会话
+                    </button>
+                    <button class="clear-history-btn" id="clearHistoryBtn">
+                        <i class="fas fa-trash"></i> 清除历史
+                    </button>
+                </div>
+                <div class="history-title">
+                    <i class="fas fa-history"></i> 历史会话
+                </div>
+                <div class="history-list" id="historyList">
+                    <!-- 历史会话将动态添加到这里 -->
+                </div>
+                <div class="session-info" id="sessionInfo"></div>
+            </div>
+
+            <div class="main-content">
+                <div class="chat-history" id="chatHistory">
+                    <!-- 消息将动态添加到这里 -->
+                    <div class="message system-message">
+                        <div class="message-header">
+                            <div class="avatar">医</div>
+                            <span>i-Health健康助手</span>
+                        </div>
+                        <div class="message-content">
+                            您好！我是i-Health健康助手，可以为您解答饮食营养、体重管理、作息睡眠、运动健身、亚健康与心理健康等问题，有什么我可以帮您的吗？
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-container">
+                    <div class="source-filter">
+                        <label for="sourceFilter">健康知识库：</label>
+                        <select id="sourceFilter">
+                            <option value="">全部</option>
+                            <!-- 学科类别选项将动态添加 -->
+                        </select>
+                    </div>
+                    <div class="input-tools">
+                        <button class="tool-btn" id="emojiBtn" title="表情">
+                            <i class="far fa-smile"></i>
+                        </button>
+                        <button class="tool-btn" id="imageBtn" title="图片">
+                            <i class="far fa-image"></i>
+                        </button>
+                        <button class="tool-btn" id="fileBtn" title="文件">
+                            <i class="far fa-file"></i>
+                        </button>
+                    </div>
+                    <div class="input-group">
+                        <textarea class="chat-input" id="chatInput" placeholder="请输入您的健康问题，例如：每天应该喝多少水？"
+                            rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" spellcheck="false"></textarea>
+                        <button class="send-btn" id="sendBtn">
+                            <i class="fas fa-paper-plane"></i> 发送
+                        </button>
+                    </div>
+                    <!-- 快捷回复 -->
+                    <div class="quick-replies" id="quickReplies">
+                        <button class="quick-reply-btn">每天应该喝多少水？</button>
+                        <button class="quick-reply-btn">每周应该运动多久？</button>
+                        <button class="quick-reply-btn">吃什么可以补铁？</button>
+                    </div>
+                </div>
+
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentSessionId = null; // 当前会话 ID
+        let sessions = []; // 历史会话列表(来自服务端 MySQL, 刷新页面/换会话都不丢失)
+        let sessionsLoadFailed = false; // 会话列表是否加载失败(用于给出明确提示, 而不是静默只剩一条)
+        let isResponseInProgress = false; // 是否正在处理响应
+        let socket = null; // WebSocket 连接
+        let isDarkMode = false; // 是否深色模式
+
+        // 前端版本 -> 便于确认浏览器加载的是最新页面(配合页面顶部版本标记排查缓存问题)
+        const APP_VERSION = 'v2.0 流式输出 · 多会话历史';
+        console.info(`i-Health 前端版本: ${APP_VERSION}`);
+
+        // localStorage key -> 记住当前会话, 刷新页面后继续在同一会话中对话
+        const CURRENT_SESSION_KEY = 'iHealth.currentSessionId';
+
+        // DOM 元素
+        const chatHistory = document.getElementById('chatHistory'); // 聊天历史容器
+        const chatInput = document.getElementById('chatInput'); // 输入框
+        const sendBtn = document.getElementById('sendBtn'); // 发送按钮
+        const sourceFilter = document.getElementById('sourceFilter'); // 学科过滤器
+        const historyList = document.getElementById('historyList'); // 历史列表
+        const sessionInfo = document.getElementById('sessionInfo'); // 会话信息
+        const newSessionBtn = document.getElementById('newSessionBtn'); // 新会话按钮
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn'); // 清除历史按钮
+        const loadingOverlay = document.getElementById('loadingOverlay'); // 加载遮罩
+        const themeToggle = document.getElementById('themeToggle'); // 主题切换按钮
+        const searchBox = document.getElementById('searchBox'); // 搜索框
+        const quickReplies = document.getElementById('quickReplies'); // 快捷回复
+        const quickReplyBtns = quickReplies.querySelectorAll('.quick-reply-btn'); // 快捷回复按钮
+        const emojiBtn = document.getElementById('emojiBtn'); // 表情按钮
+        const imageBtn = document.getElementById('imageBtn'); // 图片按钮
+        const fileBtn = document.getElementById('fileBtn'); // 文件按钮
+
+        // API URL 前缀，根据部署环境调整
+        const API_BASE_URL = ''; // 如果 API 和前端在同一域，可以留空
+
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 检查本地存储中的主题设置
+            isDarkMode = localStorage.getItem('darkMode') === 'true';
+            updateTheme();
+
+            // 加载学科类别
+            await loadSources();
+
+            // 恢复上次会话(刷新页面后仍在同一会话) 或 新建会话
+            await restoreOrCreateSession();
+
+            // 事件监听器
+            sendBtn.addEventListener('click', sendMessage); // 发送按钮点击事件
+            chatInput.addEventListener('keydown', (e) => { // 输入框键盘事件
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            newSessionBtn.addEventListener('click', createNewSession); // 新会话按钮点击事件
+            clearHistoryBtn.addEventListener('click', clearHistory); // 清除历史按钮点击事件
+            themeToggle.addEventListener('click', toggleTheme); // 主题切换按钮点击事件
+            searchBox.addEventListener('input', renderSessionList); // 搜索框输入事件 -> 过滤会话列表
+
+            // 快捷回复按钮点击事件
+            quickReplyBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    chatInput.value = btn.textContent;
+                    chatInput.style.height = 'auto';
+                    chatInput.style.height = chatInput.scrollHeight + 'px';
+                    sendMessage();
+                });
+            });
+
+            // 工具按钮点击事件
+            emojiBtn.addEventListener('click', () => alert('表情选择功能开发中'));
+            imageBtn.addEventListener('click', () => alert('图片上传功能开发中'));
+            fileBtn.addEventListener('click', () => alert('文件上传功能开发中'));
+        });
+
+        // 切换主题
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            localStorage.setItem('darkMode', isDarkMode);
+            updateTheme();
+        }
+
+        // 更新主题
+        function updateTheme() {
+            if (isDarkMode) {
+                document.body.classList.add('dark-mode');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+            } else {
+                document.body.classList.remove('dark-mode');
+                themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+            }
+        }
+
+        // HTML 转义 -> 会话标题等文本插入 DOM 前防止 XSS / 结构破坏
+        function escapeHtml(text) {
+            return String(text == null ? '' : text).replace(/[&<>"']/g, (c) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        // 时间格式化: "2025-01-02 15:04:05" -> "01-02 15:04"
+        function formatSessionTime(value) {
+            if (!value) return '';
+            const date = new Date(String(value).replace(' ', 'T'));
+            if (isNaN(date.getTime())) return String(value);
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        }
+
+        // 拉取服务端会话列表
+        async function fetchSessions() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/sessions`);
+                if (!response.ok) {
+                    throw new Error(`获取会话列表失败(HTTP ${response.status})`);
+                }
+                const data = await response.json();
+                sessions = data.sessions || [];
+                sessionsLoadFailed = false;
+                return sessions;
+            } catch (error) {
+                // 拉取失败时保留现有列表, 并记录失败状态(渲染时给出明确提示).
+                console.error('加载会话列表错误:', error);
+                sessionsLoadFailed = true;
+                return sessions;
+            }
+        }
+
+        // 加载并渲染历史会话列表
+        async function loadSessions() {
+            await fetchSessions();
+            renderSessionList();
+        }
+
+        // 渲染历史会话列表(按搜索关键字过滤, 并高亮当前会话)
+        function renderSessionList() {
+            const keyword = searchBox.value.trim().toLowerCase();
+
+            // 列表接口不可用(例如后端未重启/页面为缓存的旧版) -> 明确提示, 避免误以为"只保留一条会话"
+            if (sessionsLoadFailed) {
+                historyList.innerHTML =
+                    '<div class="history-empty">历史会话加载失败：请确认后端已重启，并强制刷新页面（Ctrl+Shift+R）</div>';
+                return;
+            }
+
+            // 当前会话若还没有任何问答记录(新建后未提问), 服务端不会返回 -> 本地补一条置顶占位
+            const list = sessions.slice();
+            if (currentSessionId && !list.some(item => item.conversation_id === currentSessionId)) {
+                list.unshift({
+                    conversation_id: currentSessionId,
+                    title: '新会话（尚未提问）',
+                    rounds: 0,
+                    last_time: ''
+                });
+            }
+
+            const filtered = keyword
+                ? list.filter(item => (item.title || '').toLowerCase().includes(keyword))
+                : list;
+
+            historyList.innerHTML = '';
+
+            if (!filtered.length) {
+                historyList.innerHTML = `<div class="history-empty">${
+                    keyword ? '没有匹配的历史会话' : '暂无历史会话'
+                }</div>`;
+                return;
+            }
+
+            filtered.forEach(session => {
+                historyList.appendChild(buildSessionItem(session));
+            });
+        }
+
+        // 构建单条历史会话DOM
+        function buildSessionItem(session) {
+            const item = document.createElement('div');
+            item.className = 'history-item' + (session.conversation_id === currentSessionId ? ' active' : '');
+            item.title = `会话ID: ${session.conversation_id}`;
+
+            const main = document.createElement('div');
+            main.className = 'history-item-main';
+
+            const question = document.createElement('div');
+            question.className = 'history-question';
+            question.textContent = session.title || '新会话';
+
+            const meta = document.createElement('div');
+            meta.className = 'history-answer';
+            const timeText = formatSessionTime(session.last_time);
+            meta.textContent = session.rounds > 0
+                ? `${session.rounds} 轮对话${timeText ? ' · ' + timeText : ''}`
+                : '尚未开始对话';
+
+            main.appendChild(question);
+            main.appendChild(meta);
+
+            // 删除按钮 -> 删除该会话全部记录
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'history-delete';
+            deleteBtn.title = '删除该会话';
+            deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+            deleteBtn.addEventListener('click', (event) => {
+                event.stopPropagation(); // 阻止冒泡, 避免误触发切换会话
+                deleteSession(session.conversation_id);
+            });
+
+            item.appendChild(main);
+            item.appendChild(deleteBtn);
+
+            // 点击会话项 -> 切换到该会话并显示其历史消息
+            item.addEventListener('click', () => switchSession(session.conversation_id));
+
+            return item;
+        }
+
+        // 恢复上次会话(存在则继续对话), 否则新建会话
+        async function restoreOrCreateSession() {
+            const savedSessionId = localStorage.getItem(CURRENT_SESSION_KEY);
+            const list = await fetchSessions();
+
+            if (savedSessionId && list.some(item => item.conversation_id === savedSessionId)) {
+                currentSessionId = savedSessionId;
+                updateSessionInfo();
+                renderSessionList();
+                await loadSessionMessages(savedSessionId);
+                return;
+            }
+
+            // 没有可恢复的会话 -> 新建(内部会刷新会话列表)
+            await createNewSession();
+        }
+
+        // 创建新会话
+        async function createNewSession() {
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/create_session`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    throw new Error('创建会话失败');
+                }
+
+                const data = await response.json();
+                currentSessionId = data.session_id; // 更新当前会话 ID
+                localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId); // 记住当前会话
+
+                // 更新会话信息
+                updateSessionInfo();
+
+                // 清空聊天历史
+                clearChatHistory();
+
+                // 重新渲染历史会话列表(新会话置顶显示为当前会话)
+                renderSessionList();
+
+            } catch (error) {
+                console.error('创建会话错误:', error);
+                alert('创建会话失败，请刷新页面重试');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 更新侧边栏会话信息
+        function updateSessionInfo() {
+            if (!currentSessionId) {
+                sessionInfo.textContent = '';
+                return;
+            }
+            sessionInfo.textContent = `会话ID: ${currentSessionId.slice(0, 8)}...`;
+        }
+
+        // 切换到指定会话(加载该会话的历史消息)
+        async function switchSession(sessionId) {
+            if (!sessionId || isResponseInProgress) return; // 回答生成中不允许切换, 避免消息串到其它会话
+            if (sessionId === currentSessionId) return;
+
+            currentSessionId = sessionId;
+            localStorage.setItem(CURRENT_SESSION_KEY, sessionId);
+            updateSessionInfo();
+            renderSessionList(); // 立即高亮当前会话
+
+            await loadSessionMessages(sessionId);
+        }
+
+        // 加载指定会话的历史消息并渲染到聊天区
+        async function loadSessionMessages(sessionId) {
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/history/${sessionId}`);
+
+                if (!response.ok) {
+                    throw new Error('获取历史记录失败');
+                }
+
+                const data = await response.json();
+
+                // 清空当前聊天区(保留欢迎语)后回填该会话的多轮问答
+                clearChatHistory();
+                (data.history || []).forEach(item => {
+                    addMessage('user', item.question); // 用户问题
+                    addMessage('system', item.answer); // 系统回答
+                });
+                scrollToBottom();
+
+            } catch (error) {
+                console.error('加载会话消息错误:', error);
+                addMessage('system', `抱歉，加载历史会话失败: ${error.message}`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 删除指定会话
+        async function deleteSession(sessionId) {
+            if (!sessionId) return;
+            if (!confirm('确定要删除该会话的全部记录吗？')) {
+                return;
+            }
+
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/history/${sessionId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error('删除会话失败');
+                }
+
+                if (sessionId === currentSessionId) {
+                    // 删除的是当前会话 -> 直接开启一个新会话
+                    currentSessionId = null;
+                    localStorage.removeItem(CURRENT_SESSION_KEY);
+                    await createNewSession();
+                } else {
+                    await loadSessions();
+                }
+
+            } catch (error) {
+                console.error('删除会话错误:', error);
+                alert('删除会话失败');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 清除当前会话的历史记录
+        async function clearHistory() {
+            if (!currentSessionId) return;
+
+            if (!confirm('确定要清除当前会话的所有历史记录吗？')) {
+                return;
+            }
+
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/history/${currentSessionId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error('清除历史记录失败');
+                }
+
+                // 清空聊天历史
+                clearChatHistory();
+
+                // 刷新会话列表(该会话记录已清空, 会话仍作为当前会话保留在列表顶部)
+                await loadSessions();
+
+            } catch (error) {
+                console.error('清除历史记录错误:', error);
+                alert('清除历史记录失败');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 加载学科类别
+        async function loadSources() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/sources`);
+
+                if (!response.ok) {
+                    throw new Error('获取学科类别失败');
+                }
+
+                const data = await response.json();
+
+                // 清空现有选项
+                sourceFilter.innerHTML = '<option value="">全部</option>';
+
+                // 添加学科类别选项
+                data.sources.forEach(source => {
+                    const option = document.createElement('option');
+                    option.value = source;
+                    option.textContent = source;
+                    sourceFilter.appendChild(option);
+                });
+
+            } catch (error) {
+                console.error('加载学科类别错误:', error);
+            }
+        }
+
+        // 清空聊天历史
+        function clearChatHistory() {
+            chatHistory.innerHTML = `
+                <div class="message system-message">
+                    <div class="message-header">
+                        <div class="avatar">医</div>
+                        <span>i-Health健康助手</span>
+                    </div>
+                    <div class="message-content">
+                        您好！我是i-Health健康助手，可以为您解答饮食营养、体重管理、作息睡眠、运动健身、亚健康与心理健康等问题，有什么我可以帮您的吗？
+                    </div>
+                </div>
+            `;
+        }
+
+        // 显示加载遮罩
+        function showLoading() {
+            loadingOverlay.style.visibility = 'visible';
+        }
+
+        // 隐藏加载遮罩
+        function hideLoading() {
+            loadingOverlay.style.visibility = 'hidden';
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            const query = chatInput.value.trim();
+            const filter = sourceFilter.value;
+
+            if (!query || isResponseInProgress) return;
+
+            // 重置输入框
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+
+            // 添加用户消息到聊天窗口
+            addMessage('user', query);
+
+            // 设置正在响应标志
+            isResponseInProgress = true;
+
+            // 添加正在输入指示器
+            const typingIndicator = document.createElement('div');
+            typingIndicator.className = 'typing-indicator';
+            typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+            chatHistory.appendChild(typingIndicator);
+
+            // 滚动到底部
+            scrollToBottom();
+
+            try {
+                // 发送查询请求
+                const response = await fetch(`${API_BASE_URL}/api/query`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        source_filter: filter,
+                        session_id: currentSessionId
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('查询失败');
+                }
+
+                const data = await response.json();
+
+                // 移除输入指示器
+                if (typingIndicator.parentNode) {
+                    chatHistory.removeChild(typingIndicator);
+                }
+
+                // 如果需要流式输出，使用 WebSocket
+                if (data.is_streaming) {
+                    // 创建系统消息容器，但内容为空
+                    const messageElement = document.createElement('div');
+                    messageElement.className = 'message system-message';
+
+                    const headerElement = document.createElement('div');
+                    headerElement.className = 'message-header';
+                    headerElement.innerHTML = `
+                        <div class="avatar">医</div>
+                        <span>i-Health健康助手</span>
+                    `;
+
+                    const contentElement = document.createElement('div');
+                    contentElement.className = 'message-content';
+                    contentElement.innerHTML = ''; // 初始化为空
+
+                    messageElement.appendChild(headerElement);
+                    messageElement.appendChild(contentElement);
+                    chatHistory.appendChild(messageElement);
+
+                    // 建立 WebSocket 连接进行流式输出
+                    await handleStreamingResponse(query, filter, contentElement);
+                } else {
+                    // 直接添加格式化后的答案
+                    addMessage('system', data.answer);
+                }
+
+                // 刷新历史会话列表(标题/轮数/最近时间同步更新)
+                await loadSessions();
+
+            } catch (error) {
+                console.error('发送消息错误:', error);
+
+                // 移除输入指示器
+                if (typingIndicator.parentNode) {
+                    chatHistory.removeChild(typingIndicator);
+                }
+
+                // 添加错误消息
+                addMessage('system', `抱歉，发生错误: ${error.message}`);
+            } finally {
+                // 清除正在响应标志
+                isResponseInProgress = false;
+
+                // 滚动到底部
+                scrollToBottom();
+            }
+        }
+
+        // 处理流式响应 -> 逐token渲染答案, 并实时展示RAG检索阶段的状态提示
+        async function handleStreamingResponse(query, filter, contentElement) {
+            // 关闭现有连接
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.close();
+            }
+
+            return new Promise((resolve, reject) => {
+                // WebSocket URL
+                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${wsProtocol}//${window.location.host}${API_BASE_URL}/api/stream`;
+
+                // 创建 WebSocket 连接
+                socket = new WebSocket(wsUrl);
+
+                let accumulatedContent = ''; // 累积流式内容
+                let finished = false; // 是否已收到结束标志
+
+                // 阶段状态提示元素 -> RAG检索期间持续反馈"正在检索知识库...", 避免前端看起来卡死
+                const statusElement = document.createElement('div');
+                statusElement.className = 'stream-status';
+                statusElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在连接服务...';
+                contentElement.appendChild(statusElement);
+
+                // 首个token到达 -> 移除状态提示, 开始渲染答案
+                const removeStatus = () => {
+                    if (statusElement.parentNode) {
+                        statusElement.parentNode.removeChild(statusElement);
+                    }
+                };
+
+                // 连接建立时
+                socket.onopen = function() {
+                    console.log('WebSocket 连接已建立');
+
+                    // 发送查询请求
+                    socket.send(JSON.stringify({
+                        query: query,
+                        source_filter: filter,
+                        session_id: currentSessionId
+                    }));
+                };
+
+                // 接收消息时
+                socket.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+
+                    switch (data.type) {
+                        case 'start':
+                            console.log('流式响应开始');
+                            break;
+
+                        case 'status':
+                            // 服务端阶段提示(检索策略/知识片段数量等) -> 实时更新提示文本
+                            statusElement.innerHTML =
+                                `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(data.message || '')}`;
+                            scrollToBottom();
+                            break;
+
+                        case 'token':
+                            // 追加 token 到内容
+                            removeStatus();
+                            accumulatedContent += data.token;
+                            // 使用 marked.js 解析 Markdown 格式
+                            try {
+                                contentElement.innerHTML = marked.parse(accumulatedContent);
+                            } catch (e) {
+                                contentElement.textContent = accumulatedContent; // 解析失败则按纯文本显示
+                            }
+                            scrollToBottom();
+                            break;
+
+                        case 'end':
+                            console.log('流式响应结束');
+                            finished = true;
+                            removeStatus();
+                            socket.close();
+                            resolve();
+                            break;
+
+                        case 'error':
+                            console.error('流式响应错误:', data.error);
+                            removeStatus();
+                            contentElement.innerHTML = marked.parse(
+                                (accumulatedContent ? accumulatedContent + '\n\n' : '') + `[错误: ${data.error}]`
+                            );
+                            finished = true;
+                            socket.close();
+                            reject(new Error(data.error));
+                            break;
+                    }
+                };
+
+                // 发生错误时
+                socket.onerror = function(error) {
+                    console.error('WebSocket 错误:', error);
+                    finished = true;
+                    removeStatus();
+                    contentElement.innerHTML += '<p>[连接错误]</p>';
+                    reject(error);
+                };
+
+                // 连接关闭时
+                socket.onclose = function() {
+                    console.log('WebSocket 连接已关闭');
+                    removeStatus(); // 兜底: 连接异常关闭时清掉状态提示, 避免一直转圈
+                    if (!finished) {
+                        // 未收到 end 就断开 -> 给出明确反馈, 而不是让用户以为卡住了
+                        const tip = '（连接已中断，请重试）';
+                        try {
+                            contentElement.innerHTML = marked.parse(accumulatedContent + tip);
+                        } catch (e) {
+                            contentElement.textContent = accumulatedContent + tip;
+                        }
+                    }
+                    resolve();
+                };
+            });
+        }
+
+        // 添加消息到聊天窗口（支持 Markdown 格式）
+        function addMessage(type, content) {
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${type === 'user' ? 'user-message' : 'system-message'}`;
+
+            // 添加消息头部
+            const headerElement = document.createElement('div');
+            headerElement.className = 'message-header';
+
+            if (type === 'user') {
+                headerElement.innerHTML = `
+                    <div class="avatar">用</div>
+                    <span>我</span>
+                `;
+            } else {
+                headerElement.innerHTML = `
+                    <div class="avatar">医</div>
+                    <span>i-Health健康助手</span>
+                `;
+            }
+
+            const contentElement = document.createElement('div');
+            contentElement.className = 'message-content';
+            // 使用 marked.js 解析 Markdown 格式（支持换行和代码块）
+            try {
+                contentElement.innerHTML = marked.parse(content);
+            } catch (e) {
+                contentElement.textContent = content; // 解析失败则按纯文本显示
+            }
+
+            messageElement.appendChild(headerElement);
+            messageElement.appendChild(contentElement);
+            chatHistory.appendChild(messageElement);
+
+            // 滚动到底部
+            scrollToBottom();
+        }
+
+        // 滚动到底部
+        function scrollToBottom() {
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+    </script>
+</body>
+</html>

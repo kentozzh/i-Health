@@ -1,0 +1,22 @@
+# ---------- 敏感配置 ----------
+config.ini
+.env
+*.env
+config.local.ini
+
+# ---------- 模型权重 (7.5GB, 请按 README 自行下载) ----------
+rag/models/
+
+# ---------- 运行时产物 ----------
+logs/
+*.log
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ---------- 个人环境 ----------
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

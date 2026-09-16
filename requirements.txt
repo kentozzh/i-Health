@@ -1,0 +1,63 @@
+# i-Health 智能健康问答系统 —— 直接依赖
+#
+# 本文件只列出项目代码直接使用的依赖, 便于阅读与手动维护。
+# 若需要与开发环境完全一致的版本(含全部传递依赖), 请改用:
+#     pip install -r requirements-lock.txt
+#
+# 环境: Python 3.10
+# 注意: 模型权重(约 7.5GB)不在仓库内, 请按 README 自行下载到 rag/models/
+
+# ---------- Web 服务 ----------
+fastapi==0.115.12
+uvicorn[standard]==0.41.0
+starlette==0.46.2
+pydantic==2.12.5
+
+# ---------- 数据库 / 缓存 / 向量库 ----------
+PyMySQL==1.1.1
+redis==5.3.1
+pymilvus==2.5.4
+milvus-model==0.2.5
+
+# ---------- 检索与向量化 ----------
+# FlagEmbedding 由 milvus-model 的 BGEM3EmbeddingFunction 在运行时加载, 代码中未直接 import
+FlagEmbedding==1.3.5
+sentence-transformers==3.0.1
+rank-bm25==0.2.2
+jieba==0.42.1
+numpy==2.2.6
+
+# ---------- 深度学习与模型训练 ----------
+torch==2.10.0
+transformers==4.45.0
+scikit-learn==1.7.2
+datasets==3.3.1
+
+# ---------- 大模型调用与编排 ----------
+openai==2.24.0
+langchain-core==1.2.16
+langchain-community==0.4.1
+langchain-text-splitters==1.1.1
+
+# ---------- 文档解析与 OCR ----------
+PyMuPDF==1.23.16
+rapidocr-onnxruntime==1.3.8
+opencv-python==4.10.0.84
+Pillow==9.5.0
+python-docx==1.1.2
+python-pptx==0.6.23
+unstructured==0.11.0
+tqdm==4.67.3
+
+# ---------- 数据处理 ----------
+pandas==2.3.1
+
+# ---------- RAGAS 评测 (rag/rag_assessment/rag_as.py) ----------
+ragas==0.2.6
+langchain-openai==1.1.10
+langchain-ollama==1.0.1
+
+# ---------- 可选依赖 ----------
+# 以下依赖未安装时, 对应功能会自动降级, 不影响主流程启动:
+# modelscope[nlp]==1.23.0   # 文档语义分段; 缺失时 rag/text_splitter/__init__.py 条件导入自动跳过
+# rapidocr-paddle           # OCR 的 GPU 加速后端; 缺失时回退到 rapidocr-onnxruntime
