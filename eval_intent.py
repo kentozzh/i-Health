@@ -28,9 +28,22 @@ _spec.loader.exec_module(_mod)
 
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix  # noqa: E402
 from sklearn.model_selection import train_test_split  # noqa: E402
-from transformers import Trainer  # noqa: E402
+from transformers import Trainer, TrainingArguments  # noqa: E402
 
 TRAIN_DATA = 'rag/bert_train_data/bert专业通用问题分类500条.json'
+
+
+def _eval_args():
+    """
+    显式给出 output_dir。
+
+    Trainer 在不传 args 时会把 output_dir 默认设为【当前工作目录】下的 "tmp_trainer"
+    (见 transformers/trainer.py), 会在项目根目录留下一个空目录 -> 指到临时目录避免污染。
+    """
+    import tempfile
+    return TrainingArguments(output_dir=tempfile.mkdtemp(prefix='intent_eval_'),
+                             per_device_eval_batch_size=8,
+                             report_to=[])
 
 
 def main():
@@ -54,7 +67,7 @@ def main():
         test_x, truncation=True, padding=True, max_length=128, return_tensors='pt')
     dataset = recognizer.create_dataset(encodings, y_true)
 
-    trainer = Trainer(model=recognizer.model)
+    trainer = Trainer(model=recognizer.model, args=_eval_args())
     output = trainer.predict(dataset)
     y_pred = np.argmax(output.predictions, axis=-1)
 

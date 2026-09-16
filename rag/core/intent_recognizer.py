@@ -138,7 +138,13 @@ class IntentRecognizer:
 
         dataset = self.create_dataset(encodings, labels)
 
-        trainer = Trainer(model=self.model)
+        # 注意: Trainer 不传 args 时会把 output_dir 默认设为【当前工作目录】下的 "tmp_trainer",
+        # 从而在项目根目录里留下一个空目录 -> 这里显式指定到临时目录, 避免污染工作区。
+        import tempfile
+        eval_args = TrainingArguments(output_dir=tempfile.mkdtemp(prefix='intent_eval_'),
+                                      per_device_eval_batch_size=8,
+                                      report_to=[])
+        trainer = Trainer(model=self.model, args=eval_args)
         predictions = trainer.predict(dataset)
 
         pred_labels = np.argmax(predictions.predictions, axis=-1)
